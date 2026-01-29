@@ -2,26 +2,74 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io, os, pickle, PyPDF2, docx, nltk, spacy
-from nltk.corpus import stopwords
+import io, os, pickle
+
+# Optional/runtime imports: try to import these and show a friendly message if missing
+missing_packages = []
+try:
+    import PyPDF2
+except Exception:
+    PyPDF2 = None
+    missing_packages.append("PyPDF2")
+try:
+    import docx
+except Exception:
+    docx = None
+    missing_packages.append("python-docx (import name: docx)")
+try:
+    import nltk
+except Exception:
+    nltk = None
+    missing_packages.append("nltk")
+try:
+    import spacy
+except Exception:
+    spacy = None
+    missing_packages.append("spacy")
+try:
+    from streamlit_lottie import st_lottie
+except Exception:
+    st_lottie = None
+    missing_packages.append("streamlit-lottie (import name: streamlit_lottie)")
+
+if missing_packages:
+    st.error("Missing Python packages required by the app: " + ", ".join(missing_packages) + ".\nPlease add them to requirements.txt and redeploy.")
+    st.stop()
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 from collections import Counter
 import requests
 from streamlit_lottie import st_lottie  # 🔥 for animation
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
-# --------------------------
-# Setup
-# --------------------------
-nltk.download('stopwords', quiet=True)
-stop_words = set(stopwords.words('english'))
+stop_words = ENGLISH_STOP_WORDS
 
-try:
-    nlp = spacy.load("en_core_web_sm")
-except Exception:
-    from spacy.lang.en import English
-    nlp = English()
+# Initialize spaCy NLP if available, otherwise use a lightweight fallback
+if spacy is not None:
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except Exception:
+        try:
+            # attempt to load by package name if model wheel is installed
+            import importlib
+            nlp = importlib.import_module("spacy").load("en_core_web_sm")
+        except Exception:
+            from spacy.lang.en import English
+            nlp = English()
+else:
+    # Very small fallback tokenizer/lemmatizer substitute using split
+    from types import SimpleNamespace
+    def naive_nlp(text):
+        class D:
+            def __init__(self,t):
+                self.text = t
+                self._tokens = [w for w in t.split()]
+            @property
+            def __iter__(self):
+                return iter(self._tokens)
+        return D(text)
+    nlp = None
 
 st.set_page_config(page_title="💼 AI Job Recommender", page_icon="💡", layout="wide")
 
@@ -108,8 +156,16 @@ def extract_text_from_docx(file):
 
 def nlp_extract_skills_from_text(text, skills_list):
     text = text.lower()
-    doc = nlp(text)
-    tokens = [token.lemma_.lower() for token in doc if token.is_alpha and token.text.lower() not in stop_words]
+    tokens = []
+    if nlp is not None:
+        try:
+            doc = nlp(text)
+            # spaCy doc: collect lemmas for alpha tokens
+            tokens = [getattr(token, 'lemma_', token.text).lower() for token in doc if getattr(token, 'is_alpha', str(token).isalpha()) and token.text.lower() not in stop_words]
+        except Exception:
+            tokens = [tok for tok in text.split() if tok.isalpha() and tok not in stop_words]
+    else:
+        tokens = [tok for tok in text.split() if tok.isalpha() and tok not in stop_words]
     extracted = []
     for skill in skills_list:
         for tok in tokens:

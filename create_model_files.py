@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 # Load dataset
 # ----------------------------
 jobs = pd.read_csv("jobs.csv")  # or jobs_cleaned.csv
-print("✅ Columns found:", jobs.columns.tolist())
+print("Columns found:", jobs.columns.tolist())
 
 # Detect the skills column
 col_name = None
@@ -35,6 +35,6 @@ job_vectors = vectorizer.fit_transform(jobs[col_name])
 pickle.dump(vectorizer, open("vectorizer.pkl", "wb"))
 jobs.to_csv("jobs_cleaned_small.csv", index=False)
 
-print("✅ vectorizer.pkl and reduced dataset saved successfully!")
+print("vectorizer.pkl and reduced dataset saved successfully!")
 print(f"Vectorizer shape: {job_vectors.shape}")
 
